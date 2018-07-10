@@ -1,0 +1,57 @@
+-- Query
+SELECT scf_code, CAST(SUM(linedollars)/COUNT(DISTINCT ordernum) AS numeric(6,2)) AS avg_spend
+FROM
+(SELECT linedollars, t2.scf_code, ordernum
+FROM lines AS t1
+INNER JOIN customers AS t2
+ON t1.cust_id = t2.cust_id) AS t
+GROUP BY scf_code
+ORDER BY SUM(linedollars)/COUNT(DISTINCT ordernum) DESC
+LIMIT 5
+
+-- Import table into Database
+-- contacts
+CREATE TABLE contacts (Cust_ID varchar(10), ContactDate date, ContactType char(3));
+COPY contacts
+FROM 'E:\oskird\course\13. Digital Marketing\asssignment\assignment 1\Digital Marketing HW1 data set\DMEFExtractContactsV01.CSV'
+WITH CSV HEADER;
+
+-- lines
+CREATE TABLE lines (Cust_ID varchar(10), OrderNum varchar(12), OrderDate date, LineDollars NUMERIC(6, 2), Gift varchar(3), RecipNum varchar(10));
+COPY lines
+FROM 'E:\oskird\course\13. Digital Marketing\asssignment\assignment 1\Digital Marketing HW1 data set\DMEFExtractLinesV01.csv'
+WITH CSV HEADER
+NULL ' ';
+
+-- orders
+CREATE TABLE orders (Cust_ID char(10), OrderNum varchar(12), OrderDate date, OrderMethod varchar(4), PaymentType varchar(3));
+COPY orders
+FROM 'E:\oskird\course\13. Digital Marketing\asssignment\assignment 1\Digital Marketing HW1 data set\DMEFExtractOrdersV01.CSV'
+WITH CSV HEADER
+NULL ' ';
+
+-- customers
+CREATE TABLE customers (Cust_ID	varchar, SCF_Code varchar, RetF07Dollars integer, RetF07Trips integer, RetF07Lines integer,	RetS07Dollars integer,
+RetS07Trips integer, RetS07Lines integer, RetF06Dollars integer, RetF06Trips integer, RetF06Lines integer, RetS06Dollars integer, RetS06Trips integer, RetS06Lines integer,
+RetF05Dollars integer, RetF05Trips integer, RetF05Lines integer, RetS05Dollars integer, RetS05Trips integer, RetS05Lines integer, RetF04Dollars integer, RetF04Trips integer,
+RetF04Lines integer, RetS04Dollars integer, RetS04Trips integer, RetS04Lines integer, RetPre04Dollars integer, RetPre04Trips integer, RetPre04Lines integer, RetPre04Recency integer,
+IntF07GDollars integer,	IntF07NGDollars integer, IntF07Orders integer, IntF07Lines integer, IntS07GDollars integer,	IntS07NGDollars integer, IntS07Orders integer, IntS07Lines integer,
+IntF06GDollars integer,	IntF06NGDollars integer, IntF06Orders integer, IntF06Lines integer,	IntS06GDollars integer,	IntS06NGDollars integer, IntS06Orders integer, IntS06Lines integer,
+IntF05GDollars integer,	IntF05NGDollars integer, IntF05Orders integer, IntF05Lines integer,	IntS05GDollars integer,	IntS05NGDollars integer, IntS05Orders integer, IntS05Lines integer,
+IntF04GDollars integer,	IntF04NGDollars integer, IntF04Orders integer, IntF04Lines integer,	IntS04GDollars integer,	IntS04NGDollars integer, IntS04Orders integer, IntS04Lines integer,
+IntPre04GDollars integer, IntPre04NGDollars integer, IntPre04Orders integer, IntPre04Lines integer,	IntPre04Recency integer, CatF07GDollars integer, CatF07NGDollars integer,
+CatF07Orders integer, CatF07Lines integer, CatS07GDollars integer, CatS07NGDollars integer,	CatS07Orders integer, CatS07Lines integer, CatF06GDollars integer, CatF06NGDollars integer,
+CatF06Orders integer, CatF06Lines integer, CatS06GDollars integer, CatS06NGDollars integer,	CatS06Orders integer, CatS06Lines integer, CatF05GDollars integer, CatF05NGDollars integer,
+CatF05Orders integer, CatF05Lines integer, CatS05GDollars integer, CatS05NGDollars integer,	CatS05Orders integer, CatS05Lines integer, CatF04GDollars integer, CatF04NGDollars integer,
+CatF04Orders integer, CatF04Lines integer, CatS04GDollars integer, CatS04NGDollars integer,	CatS04Orders integer, CatS04Lines integer, CatPre04GDollars integer, CatPre04NGDollars integer,
+CatPre04Orders integer,	CatPre04Lines integer, CatPre04Recency integer,	EmailsF07 integer,	EmailsS07 integer,	EmailsF06 integer, EmailsS06 integer, EmailsF05 integer, EmailsS05 integer,
+CatCircF07 integer,	CatCircS07 integer,	CatCircF06 integer,	CatCircS06 integer,	CatCircF05 integer,	CatCircS05 integer,	GiftRecF07 integer,	GiftRecS07 integer,	GiftRecF06 integer,
+GiftRecS06 integer,	GiftRecF05 integer,	GiftRecS05 integer,	GiftRecF04 integer,	GiftRecS04 integer,	GiftRecPre04 integer, NewGRF07 integer, NewGRS07 integer, NewGRF06 integer,	NewGRS06 integer,
+NewGRF05 integer, NewGRS05 integer,	NewGRF04 integer, NewGRS04 integer,	NewGRPre04 integer,	FirstYYMM date, FirstChannel varchar, FirstDollar integer, StoreDist numeric(10,2),
+AcqDate date, Email varchar, OccupCd varchar, Travel varchar(2), CurrAff varchar(2), CurrEv varchar(2), Wines varchar(2), FineArts varchar(2), Exercise varchar(2), SelfHelp varchar(2), Collect varchar(2),  Needle varchar(2),
+Sewing varchar(2), DogOwner varchar(2), CarOwner varchar(2), Cooking varchar(2), Pets varchar(2), Fashion varchar(2), Camping varchar(2), Hunting varchar(2), Boating varchar(2), AgeCode integer, IncCode integer,
+HomeCode integer, Child0_2 char(2), Child3_5 char(2), Child6_11 char(2), Child12_16 char(2), Child17_18 char(2), Dwelling integer, LengthRes integer, HomeValue integer);
+COPY customers
+FROM 'E:\oskird\course\13. Digital Marketing\asssignment\assignment 1\Digital Marketing HW1 data set\DMEFExtractSummaryV01.CSV'
+WITH CSV HEADER
+NULL ' '

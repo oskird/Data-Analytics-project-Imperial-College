@@ -1,0 +1,256 @@
+---
+title: "ML HW3"
+author: "Group L"
+date: "2017/12/8"
+output: html_document
+---
+
+```{r warning=FALSE, message=FALSE}
+library(readr)
+library(C50)
+library(gmodels)
+library(dplyr)
+data <- read.csv("Loans_processed.csv", stringsAsFactors=TRUE)
+names(data)[1] = "loan_amnt"
+summary(data)
+```
+
+
+##  1. Import the pre-processed data set in R. Shuffle the records and split them into a training set (20,000 records), a validation set (8,000 records) and a test set (all remaining records).
+
+```{r warning=FALSE, message=FALSE}
+set.seed(123)
+shuffle <- sample(nrow(data), nrow(data), replace = FALSE)
+trainset <- data[shuffle[1:20000],]
+validset <- data[shuffle[20001:28000],]
+testset <- data[shuffle[28001:length(shuffle)],]
+#length(shuffle)
+
+train_data <- trainset[,-8]
+train_label <- trainset[,8]
+valid_data <- validset[,-8]
+valid_label <- validset[,8]
+test_data <- testset[,-8]
+test_label <- testset[,8]
+```
+We first shuffle our data in order to split them randomly into a training (20,000 records), validation (8,000 records) and test (10,708 records) set (51.7%, 20.7% and 27.6% split). 
+
+## 2. Using a classification tree, try to predict with an accuracy greater than "# of repaid loans / # of repaid loans +  # of charged off loans" if a loan will be repaid. Do you manage to achieve this performance on the validation set? What about the training set?
+
+```{r warning=FALSE, message=FALSE}
+# accuracy without model (which means predicting all as 'Fully Paid')
+accuracy_threshold_train <- as.numeric(table(train_label)[2] / (table(train_label)[1]+table(train_label)[2]))
+accuracy_threshold_valid <- as.numeric(table(valid_label)[2] / (table(valid_label)[1]+table(valid_label)[2]))
+accuracy_threshold_train
+accuracy_threshold_valid
+```
+
+Results of the classification tree based on the training data set:
+```{r warning=FALSE, message=FALSE}
+# model with default parameter
+model_train <- C5.0(train_data, train_label)
+summary(model_train)
+```
+These results tell us that 17,201 records in our training data were classified as “Fully paid”, while 2,799 were “Charged off”. Also, from this we can see that 14% of cases were incorrectly classified, which accounts for 2,799 out of the 20,000 records used for training. In other words, our accuracy here is estimated to be 86.005%.
+
+Results of the classification tree based on the validation data set:
+```{r warning=FALSE, message=FALSE}
+model_valid <- C5.0(valid_data, valid_label)
+summary(model_valid)
+```
+From the summary of our validation model, we can see that 6,864 records were classified as “Fully paid”, while 1,136 of the sample records were “Charged off”. Our accuracy here is estimated to be 85.8% with an error rate of 14.2%.
+
+Results of our prediction:
+```{r warning=FALSE, message=FALSE}
+# Use model on train set
+train_pred <- predict(model_train, train_data, type = "class")
+summary(train_pred)
+
+model_accuracy_train <- mean(train_pred == train_label)
+model_accuracy_train == accuracy_threshold_train
+```
+Results of our prediction: 
+```{r warning=FALSE, message=FALSE}
+# Use model on validation set
+valid_pred <- predict(model_train, valid_data, type = "class")
+summary(valid_pred)
+
+model_accuracy <- mean(valid_pred == valid_label)
+model_accuracy == accuracy_threshold_valid
+```
+We make predictions by inputting our models and the data that we want to make predictions from into the predict() function. The type="class" argument specifies that we want the actual class labels as output, rather than the probability that the class label was "Fully Paid" or "Charged off". 
+
+According to our prediction, the loan status of all the samples of our training and validation set are predicted to be “Fully Paid”. However, in reality, only 17,201 records (86.005%) in the training set are classified as "Fully Paid" and only 6,864 of the sample (85.8%) in the validation set are characterised as “Fully Paid”. 
+
+From this, we can suggest that this might not be the optimal method in predicting and finding the default cases.
+
+We can't improve the accuracy both on train and valid dataset. The model with highest accuracy is just predicting all the sample as "Fully Paid"
+
+## 3. Experiment with different cost matrices to achieve a sensitivity (also known as recall) of approximately 25%, 40% and 50% in your validation set.Also report the percentage of the loans n11 / (n11+n21) you would recommend to the bank for re-evaluation that were indeed charged off.
+
+Write a function to find the approximate sensitivity.
+
+```{r}
+matrix_dimensions <- list(c("Charged Off", "Fully Paid"),c("Charged Off", "Fully Paid"))
+names(matrix_dimensions) <- c("predicted", "actual")
+find_cost_for_sensitivity <- function(train, label, valid, valid_label, target_sen){
+  min_i <- 0
+  min_sen <- "max"
+  for (i in seq(3,6,0.1)){
+    error_cost <- matrix(c(0,i,1,0), nrow = 2, dimnames = matrix_dimensions)
+    model <- C5.0(train, label, costs = error_cost)
+    valid_pred <- predict(model, valid)
+    cm <- table(valid_label, valid_pred)
+    sensitivity <- cm[1,1] / (cm[1,1]+cm[1,2])
+    if (abs(sensitivity-target_sen) < min_sen){
+      min_sen <- abs(sensitivity-target_sen)
+      min_i <- i
+    }
+  }
+  return(min_i)
+}
+```
+
+The cost matrix should be CxC, where C is the number of classes. Diagonal elements are ignored, and the cost matrix changes the weight of two types of falses (these values are both 1 by default). Columns correspond to the true classes (actual values) while rows represent the predicted classes. 
+
+The matrix needs to be re-weighted because improving the model's accuracy is not the only goal in machine learning (or the business world), since the cost of making the two different types of mistakes are not the same. For example, if we predict as "Fully Paid" a customer who will in reality be "Charged off", (meaning that we give a loan to a person who will defaut on it), the cost incurred will be much higher than if we predict a customer who is going to be "Fully Paid" as "Charged off" (which means we reject giving a loan to a good customer and we lose the potential customer).
+Therefore, it is in our best interested to correctly identify the cases where the risk of default is high, as this will have a high cost for us.
+
+In our case, if C = 2 with classes "Charged off" and "Fully Paid" respectively, a value of 3.4 in the (2,1) position of the matrix indicates that it is 3.4 times more costly to predict a "Charged Off" record as "Fully Paid".
+
+```{r warning=FALSE, message=FALSE}
+i_25 <- find_cost_for_sensitivity(train=train_data, label=train_label, valid=valid_data, valid_label=valid_label, target_sen=0.25)
+
+#Sensitivity matrix of 25% is calculated from the following cost matrix:
+error_cost_25 <- matrix(c(0,i_25,1,0), nrow = 2, dimnames = matrix_dimensions)
+model_25 <- C5.0(train_data, train_label, costs = error_cost_25)
+model_25
+
+#Confusion matrix a for validation data:
+valid_pred_25 <- predict(model_25, valid_data)
+cm_25 <- table(valid_pred_25, valid_label)
+cm_25
+
+sensitivity_25 <- cm_25[1,1] / (cm_25[1,1]+cm_25[2,1])
+print(paste("Sensitivity: ", as.character(sensitivity_25)))
+precision_25 <- cm_25[1,1] / (cm_25[1,1]+cm_25[1,2])
+print(paste("Precision: ", as.character(precision_25)))
+```
+
+```{r warning=FALSE, message=FALSE}
+i_40 <- find_cost_for_sensitivity(train=train_data, label=train_label, valid=valid_data, valid_label=valid_label, target_sen=0.40)
+
+#Sensitivity matrix of 40% is calculated from the following cost matrix:
+error_cost_40 <- matrix(c(0,i_40,1,0), nrow = 2, dimnames = matrix_dimensions)
+model_40 <- C5.0(train_data, train_label, costs = error_cost_40)
+model_40
+
+#Confusion matrix b for validation data:
+valid_pred_40 <- predict(model_40, valid_data)
+cm_40 <- table(valid_pred_40, valid_label)
+cm_40
+
+sensitivity_40 <- cm_40[1,1] / (cm_40[1,1]+cm_40[2,1])
+print(paste("Sensitivity: ", as.character(sensitivity_40)))
+precision_40 <- cm_40[1,1] / (cm_40[1,1]+cm_40[1,2])
+print(paste("Precision: ", as.character(precision_40)))
+```
+
+```{r warning=FALSE, message=FALSE}
+i_50 <- find_cost_for_sensitivity(train=train_data, label=train_label, valid=valid_data, valid_label=valid_label, target_sen=0.50)
+
+#Sensitivity matrix of 50% is calculated from the following cost matrix:
+error_cost_50 <- matrix(c(0,i_50,1,0), nrow = 2, dimnames = matrix_dimensions)
+model_50 <- C5.0(train_data, train_label, costs = error_cost_50)
+model_50
+
+#Confusion matrix c for validation data:
+valid_pred_50 <- predict(model_50, valid_data)
+cm_50 <- table(valid_pred_50, valid_label)
+cm_50
+
+sensitivity_50 <- cm_50[1,1] / (cm_50[1,1]+cm_50[2,1])
+print(paste("Sensitivity: ", as.character(sensitivity_50)))
+precision_50 <- cm_50[1,1] / (cm_50[1,1]+cm_50[1,2])
+print(paste("Precision: ", as.character(precision_50)))
+```
+
+
+## 4. Pick a cost parameter matrix that you assess as the most appropriate for identifying loan applications that deserve further examination.
+
+Sensitivity and precision have a an inverse relationship, where recall indicates the number of positives that were correctly identified out of all actual positives (true positives and false negatives), and precision indicates how many true positives were identified out of all classified positives (true positives and false positives). If a model has a high recall, it's sensitivity rate will be lower, and vice-versa - the goal is to find the correct balance between both, keeping in mind the type of classification problem at hand. In our case, we want to minimize the number of actual charged off cases predicted as fully paid cases, since these are the costliest mis-calssification we could make. According to the cost matrices above, a higher sensitivity value reduces the number of records mis-classified as "Fully Paid".
+
+
+```{r warning=FALSE, message=FALSE}
+library(plotly)
+recall <- c(sensitivity_25, sensitivity_40, sensitivity_50)
+precision <- c(precision_25, precision_40, precision_50)
+eval <- cbind(recall, precision)
+eval <- data.frame(eval)
+#ggplot(data = eval, aes(x = sensitivity.recall, y = precision)) + geom_line()
+
+plot_ly(x = recall, y = precision, name = 'Recall/Precision Trade-Off', mode = 'lines') %>% layout(
+         yaxis = list(title = "Precision"),
+         xaxis = list(title = "Recall"))
+```
+
+Given the interest rates given on Lending Club's website, (https://www.lendingclub.com/info/demand-and-credit-profile.action), we were able to calculate the average loss per defaulting customer and average revenue per payed off loan customer. These averages will be used to find the best cost parameter matrix for our final model evaluation.
+
+```{r warning=FALSE, message=FALSE}
+# calculate the expected cost
+names(data)[1] = "loan_amnt"
+true_cost_charged_off <- mean(data$loan_amnt)
+a <- 0.1235
+b <- 0.1626
+data_2 <- data %>% mutate(interest = ifelse(term == 36, a, b)) %>% 
+  mutate(profit=loan_amnt * interest)
+true_cost_losing_customer <- mean(data_2$profit)
+
+# convert it into ratio
+ratio <- true_cost_charged_off / true_cost_losing_customer
+cost_losing_customer <- 1
+cost_charged_off <- cost_losing_customer * ratio
+```
+
+Select the best model which leads to lowest cost. 
+
+```{r warning=FALSE, message=FALSE}
+# Search the best i
+cost_vector <- c(3.4, 4.4, 4.8)
+
+total_cost_best <- "max" # string always bigger than numeric
+i_best <- 0
+for (i in cost_vector){
+  error_cost_best <- matrix(c(0,i,1,0), nrow = 2, dimnames = matrix_dimensions)
+  model_test <- C5.0(train_data, train_label, costs = error_cost_best)
+  valid_pred <- predict(model_test, valid_data)
+  cm_test <- table(valid_pred, valid_label)
+  total_cost <- cm_test[2,1]*cost_charged_off+cm_test[1,2]*cost_losing_customer
+  if (total_cost < total_cost_best){
+    total_cost_best <- total_cost
+    i_best <- i
+  }
+}
+i_best
+```
+
+Our findings from part 3 indicate that the cost matrix with 50% specificity has a lower ratio of actual ‘Charged off’ loans predicted to be ‘Fully Paid’(7.2% vs. 10.6% for the cost matrix for a sensitivity of 25% and 8.6% for a specificity of 40%).
+
+Our results for the model with a sensativity of 50% however has a higher percentage of actual “Fully Paid” loans classified as “Charged off” (25.8% vs. 20.5% for a sensitivity of 40% and 11.5% for a specificity of 25%). This is due to the fact that sensitivity and precision are trade-offs, and since sensitivity is more important in this case, we will accept a better recall at the expense of lower precision.
+
+
+## 5.  Evaluate the performance of your cost parameter matrix on the test set.
+
+```{r warning=FALSE, message=FALSE}
+error_cost_best <- matrix(c(0,i_best,1,0), nrow = 2, dimnames = matrix_dimensions)
+model_final <- C5.0(train_data, train_label, costs = error_cost_best)
+test_pred <- predict(model_final, test_data)
+cm_final <- table(test_pred,test_label) 
+accuracy_final_test <- mean(test_pred == test_label)
+cm_final
+sensitivity_final <- cm_final[1,1] / (cm_final[1,1]+cm_final[2,1])
+print(paste("Sensitivity: ", as.character(sensitivity_final)))
+precision_final <- cm_final[1,1] / (cm_final[1,1]+cm_final[1,2])
+print(paste("Precision: ", as.character(precision_final)))
+print(paste("Accuracy: ", as.character(accuracy_final_test)))
+```
